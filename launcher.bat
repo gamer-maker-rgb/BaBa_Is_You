@@ -1,16 +1,37 @@
 @echo off
 setlocal
 
-rem Update this folder from the GitHub repo, then open index.html
-set "BABA_INSTALL_DIR=%~dp0"
+rem Download the newest repo files into this folder, then open index.html
+set "ROOT=%~dp0"
+set "TMP=%TEMP%\baba-update-%RANDOM%"
+mkdir "%TMP%" 2>nul
+set "ZIP=%TMP%\repo.zip"
+
+curl.exe -L --fail "https://github.com/gamer-maker-rgb/BaBa_Is_You/archive/refs/heads/main.zip" -o "%ZIP%"
+if errorlevel 1 (
+  echo.
+  echo Download failed. Check your internet connection and try again.
+  pause
+  exit /b 1
+)
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ErrorActionPreference='Stop'; $install=$env:BABA_INSTALL_DIR; $work=Join-Path $env:TEMP ('baba-update-'+[guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $work | Out-Null; $zip=Join-Path $work 'repo.zip'; Invoke-WebRequest -Uri 'https://github.com/gamer-maker-rgb/BaBa_Is_You/archive/refs/heads/main.zip' -OutFile $zip; Expand-Archive -LiteralPath $zip -DestinationPath $work; $source=Get-ChildItem -LiteralPath $work -Directory | Select-Object -First 1; if (-not $source) { throw 'Download failed.' }; $repoRoot=Join-Path $source.FullName 'BaBa_Is_You-main'; if (-not (Test-Path -LiteralPath $repoRoot)) { $repoRoot=$source.FullName }; Get-ChildItem -LiteralPath $repoRoot -Force | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $install -Recurse -Force }; $page=Join-Path $install 'index.html'; if (-not (Test-Path -LiteralPath $page)) { throw 'index.html not found after update.' }; Start-Process -FilePath $page; if ($work -and (Test-Path -LiteralPath $work)) { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }"
+"$ErrorActionPreference='Stop'; $zip='%ZIP%'; $tmp='%TMP%'; Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force; $folder = Get-ChildItem -LiteralPath $tmp -Directory | Where-Object { $_.Name -like 'BaBa_Is_You*' } | Sort-Object Name | Select-Object -First 1; if (-not $folder) { throw 'The archive did not contain the expected repo folder.' }; Get-ChildItem -LiteralPath $folder.FullName -Force | Where-Object { $_.Name -ne 'launcher.bat' } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination '%ROOT%' -Recurse -Force }"
 
 if errorlevel 1 (
   echo.
-  echo The game could not be updated. Check your internet connection and try again.
+  echo The game could not be updated.
+  pause
+  exit /b 1
+)
+
+if exist "%ROOT%index.html" (
+  start "" "%ROOT%index.html"
+) else (
+  echo.
+  echo index.html was not found after update.
   pause
 )
 
+rmdir /s /q "%TMP%"
 endlocal
